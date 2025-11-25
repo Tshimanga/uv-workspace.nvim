@@ -130,47 +130,51 @@ function M.get_workspace_extra_paths(member_root)
   return extra_paths
 end
 
--- Plugin spec
-return {
-  "neovim/nvim-lspconfig",
-  opts = function(_, opts)
-    opts.servers = opts.servers or {}
-    opts.servers.pyright = opts.servers.pyright or {}
+--- Inject extra paths into pyright's before_init
+---@param init_params table LSP initialize params
+---@param config table LSP client config
+local function inject_extra_paths(init_params, config)
+  local extra_paths = M.get_workspace_extra_paths(config.root_dir)
+  if #extra_paths > 0 then
+    -- Update config.settings
+    config.settings = config.settings or {}
+    config.settings.python = config.settings.python or {}
+    config.settings.python.analysis = config.settings.python.analysis or {}
 
-    local original_before_init = opts.servers.pyright.before_init
+    local existing = config.settings.python.analysis.extraPaths or {}
+    local all_paths = vim.list_extend({}, existing)
 
-    opts.servers.pyright.before_init = function(init_params, config)
-      -- Call original if it exists
-      if original_before_init then
-        original_before_init(init_params, config)
-      end
-
-      local extra_paths = M.get_workspace_extra_paths(config.root_dir)
-      if #extra_paths > 0 then
-        -- Update config.settings
-        config.settings = config.settings or {}
-        config.settings.python = config.settings.python or {}
-        config.settings.python.analysis = config.settings.python.analysis or {}
-
-        local existing = config.settings.python.analysis.extraPaths or {}
-        local all_paths = vim.list_extend({}, existing)
-
-        for _, path in ipairs(extra_paths) do
-          if not vim.tbl_contains(all_paths, path) then
-            table.insert(all_paths, path)
-          end
-        end
-
-        config.settings.python.analysis.extraPaths = all_paths
-
-        -- Also update initializationOptions for pyright
-        init_params.initializationOptions = init_params.initializationOptions or {}
-        init_params.initializationOptions.python = init_params.initializationOptions.python or {}
-        init_params.initializationOptions.python.analysis = init_params.initializationOptions.python.analysis or {}
-        init_params.initializationOptions.python.analysis.extraPaths = all_paths
+    for _, path in ipairs(extra_paths) do
+      if not vim.tbl_contains(all_paths, path) then
+        table.insert(all_paths, path)
       end
     end
 
-    return opts
-  end,
-}
+    config.settings.python.analysis.extraPaths = all_paths
+
+    -- Also update initializationOptions for pyright
+    init_params.initializationOptions = init_params.initializationOptions or {}
+    init_params.initializationOptions.python = init_params.initializationOptions.python or {}
+    init_params.initializationOptions.python.analysis = init_params.initializationOptions.python.analysis or {}
+    init_params.initializationOptions.python.analysis.extraPaths = all_paths
+  end
+end
+
+--- Configure pyright in lspconfig opts to support uv workspaces
+--- Call this from your lspconfig opts function
+---@param opts table LazyVim lspconfig opts
+function M.configure_pyright(opts)
+  opts.servers = opts.servers or {}
+  opts.servers.pyright = opts.servers.pyright or {}
+
+  local original_before_init = opts.servers.pyright.before_init
+
+  opts.servers.pyright.before_init = function(init_params, config)
+    if original_before_init then
+      original_before_init(init_params, config)
+    end
+    inject_extra_paths(init_params, config)
+  end
+end
+
+return M

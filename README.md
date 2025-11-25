@@ -51,11 +51,14 @@ Requires [LazyVim][lazyvim] and Neovim 0.11+.
 ```lua
 -- lua/plugins/uv-workspace.lua
 return {
-  "Tshimanga/uv-workspace.nvim",
+  "neovim/nvim-lspconfig",
+  dependencies = { "Tshimanga/uv-workspace.nvim" },
+  opts = function(_, opts)
+    require("uv-workspace").configure_pyright(opts)
+    return opts
+  end,
 }
 ```
-
-That's it. The plugin automatically integrates with LazyVim's lspconfig setup.
 
 ## Requirements
 
