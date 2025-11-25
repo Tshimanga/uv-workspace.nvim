@@ -1,5 +1,5 @@
--- uv-workspace.nvim
--- Enables Pyright to resolve imports between uv workspace members
+-- Support for uv workspaces in Pyright
+-- Automatically adds workspace member paths to extraPaths for proper import resolution
 
 local M = {}
 
@@ -130,37 +130,24 @@ function M.get_workspace_extra_paths(member_root)
   return extra_paths
 end
 
---- Setup function to hook into nvim-lspconfig's pyright
---- Call this after lspconfig is loaded
----@param opts? table Optional configuration (reserved for future use)
-function M.setup(opts)
-  opts = opts or {}
+-- Plugin spec
+return {
+  "neovim/nvim-lspconfig",
+  opts = function(_, opts)
+    opts.servers = opts.servers or {}
+    opts.servers.pyright = opts.servers.pyright or {}
 
-  local ok, lspconfig = pcall(require, "lspconfig")
-  if not ok then
-    vim.notify("uv-workspace.nvim: nvim-lspconfig is required", vim.log.levels.WARN)
-    return
-  end
+    local original_before_init = opts.servers.pyright.before_init
 
-  local configs = require("lspconfig.configs")
-  if not configs.pyright then
-    vim.notify("uv-workspace.nvim: pyright config not found in lspconfig", vim.log.levels.WARN)
-    return
-  end
-
-  -- Store original on_new_config if it exists
-  local original_on_new_config = lspconfig.pyright.on_new_config
-
-  -- Override on_new_config to inject workspace paths
-  lspconfig.pyright.setup({
-    on_new_config = function(config, root_dir)
+    opts.servers.pyright.before_init = function(init_params, config)
       -- Call original if it exists
-      if original_on_new_config then
-        original_on_new_config(config, root_dir)
+      if original_before_init then
+        original_before_init(init_params, config)
       end
 
-      local extra_paths = M.get_workspace_extra_paths(root_dir)
+      local extra_paths = M.get_workspace_extra_paths(config.root_dir)
       if #extra_paths > 0 then
+        -- Update config.settings
         config.settings = config.settings or {}
         config.settings.python = config.settings.python or {}
         config.settings.python.analysis = config.settings.python.analysis or {}
@@ -175,9 +162,15 @@ function M.setup(opts)
         end
 
         config.settings.python.analysis.extraPaths = all_paths
-      end
-    end,
-  })
-end
 
-return M
+        -- Also update initializationOptions for pyright
+        init_params.initializationOptions = init_params.initializationOptions or {}
+        init_params.initializationOptions.python = init_params.initializationOptions.python or {}
+        init_params.initializationOptions.python.analysis = init_params.initializationOptions.python.analysis or {}
+        init_params.initializationOptions.python.analysis.extraPaths = all_paths
+      end
+    end
+
+    return opts
+  end,
+}

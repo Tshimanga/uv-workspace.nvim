@@ -46,123 +46,21 @@ include relative paths to sibling workspace members. When Pyright starts for
 
 ## Installation
 
-### lazy.nvim
+Requires [LazyVim][lazyvim] and Neovim 0.11+.
 
 ```lua
-{
+-- lua/plugins/uv-workspace.lua
+return {
   "Tshimanga/uv-workspace.nvim",
-  config = function()
-    require("uv-workspace").setup()
-  end,
 }
 ```
 
-### lazy.nvim (LazyVim)
-
-For LazyVim users who want to integrate with the existing lspconfig setup:
-
-```lua
-{
-  "neovim/nvim-lspconfig",
-  dependencies = { "Tshimanga/uv-workspace.nvim" },
-  opts = function(_, opts)
-    opts.servers = opts.servers or {}
-    opts.servers.pyright = opts.servers.pyright or {}
-
-    local uv_workspace = require("uv-workspace")
-    local original_on_new_config = opts.servers.pyright.on_new_config
-
-    opts.servers.pyright.on_new_config = function(config, root_dir)
-      if original_on_new_config then
-        original_on_new_config(config, root_dir)
-      end
-
-      local extra_paths = uv_workspace.get_workspace_extra_paths(root_dir)
-      if #extra_paths > 0 then
-        config.settings = config.settings or {}
-        config.settings.python = config.settings.python or {}
-        config.settings.python.analysis =
-          config.settings.python.analysis or {}
-
-        local existing =
-          config.settings.python.analysis.extraPaths or {}
-        local all_paths = vim.list_extend({}, existing)
-
-        for _, path in ipairs(extra_paths) do
-          if not vim.tbl_contains(all_paths, path) then
-            table.insert(all_paths, path)
-          end
-        end
-
-        config.settings.python.analysis.extraPaths = all_paths
-      end
-    end
-
-    return opts
-  end,
-}
-```
-
-## API
-
-### `setup(opts?)`
-
-Hooks into nvim-lspconfig to automatically configure Pyright for uv workspaces.
-Call after lspconfig is loaded.
-
-```lua
-require("uv-workspace").setup()
-```
-
-### `get_workspace_extra_paths(member_root)`
-
-Returns a list of relative paths to sibling workspace members. Useful for
-manual integration.
-
-```lua
-local paths = require("uv-workspace").get_workspace_extra_paths(
-  "/path/to/packages/bar"
-)
--- Returns: { "../foo", "../baz" }
-```
-
-### `find_uv_workspace_root(start_path)`
-
-Finds the uv workspace root by searching parent directories for
-`pyproject.toml` with `[tool.uv.workspace]`.
-
-```lua
-local root, content = require("uv-workspace").find_uv_workspace_root(
-  "/path/to/packages/bar"
-)
-```
-
-### `parse_workspace_members(content)`
-
-Parses workspace member patterns from pyproject.toml content.
-
-```lua
-local members = require("uv-workspace").parse_workspace_members(
-  pyproject_content
-)
--- Returns: { "packages/*" }
-```
-
-### `resolve_member_paths(root_path, patterns)`
-
-Resolves glob patterns to actual directory paths.
-
-```lua
-local paths = require("uv-workspace").resolve_member_paths(
-  "/path/to/workspace",
-  { "packages/*" }
-)
--- Returns: { "/path/to/workspace/packages/foo", ... }
-```
+That's it. The plugin automatically integrates with LazyVim's lspconfig setup.
 
 ## Requirements
 
-- [nvim-lspconfig][lspconfig]
+- Neovim 0.11+
+- [LazyVim][lazyvim]
 - [Pyright][pyright] language server
 
 ## License
@@ -171,4 +69,4 @@ local paths = require("uv-workspace").resolve_member_paths(
 
 [pyright]: https://github.com/microsoft/pyright
 [uv-workspaces]: https://docs.astral.sh/uv/concepts/projects/workspaces/
-[lspconfig]: https://github.com/neovim/nvim-lspconfig
+[lazyvim]: https://www.lazyvim.org/
